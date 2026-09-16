@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>週二午餐訂餐訊息產生器</title>
+<style>
+  :root {
+    --bg: #f4f5f7;
+    --card: #ffffff;
+    --border: #e2e4e8;
+    --text: #1f2328;
+    --muted: #6b7280;
+    --accent: #2563eb;
+    --accent-hover: #1d4ed8;
+    --accent-soft: #eef2ff;
+    --success: #16a34a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 16px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Microsoft JhengHei", "Segoe UI", sans-serif;
+    display: flex;
+    justify-content: center;
+  }
+  .wrap {
+    width: 100%;
+    max-width: 760px;
+  }
+  h1 {
+    font-size: 22px;
+    margin: 0 0 4px;
+  }
+  .subtitle {
+    color: var(--muted);
+    font-size: 14px;
+    margin: 0 0 24px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  .card h2 {
+    font-size: 15px;
+    margin: 0 0 14px;
+    color: var(--text);
+  }
+  label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  select, input[type="text"], textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+    background: #fff;
+    color: var(--text);
+  }
+  select:focus, input:focus, textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  .field { margin-bottom: 14px; }
+  .field:last-child { margin-bottom: 0; }
+  .row {
+    display: flex;
+    gap: 12px;
+  }
+  .row > div { flex: 1; }
+  .hint {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 6px;
+  }
+  .restaurant-meta {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 8px;
+    line-height: 1.6;
+  }
+  textarea#participants {
+    min-height: 110px;
+    resize: vertical;
+    line-height: 1.6;
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 11px 20px;
+    border-radius: 8px;
+    border: none;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+    width: 100%;
+  }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-secondary {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+  .btn-secondary:hover { background: #e0e7ff; }
+  .output-wrap { position: relative; }
+  textarea#output {
+    min-height: 320px;
+    white-space: pre-wrap;
+    line-height: 1.7;
+    font-size: 14px;
+    background: #fafbfc;
+  }
+  .output-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .copied-msg {
+    font-size: 13px;
+    color: var(--success);
+    font-weight: 600;
+    align-self: center;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+  .copied-msg.show { opacity: 1; }
+  details summary {
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--accent);
+    font-weight: 600;
+    user-select: none;
+  }
+  details { margin-top: 10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>週二午餐訂餐訊息產生器</h1>
+  <p class="subtitle">選擇本週餐廳與接力回覆名單，一鍵產生可直接貼到 LINE 群組的訊息。</p>
+
+  <div class="card">
+    <h2>① 選擇本週餐廳</h2>
+    <div class="field">
+      <label for="restaurantSelect">餐廳清單</label>
+      <select id="restaurantSelect"></select>
+    </div>
+    <div class="field">
+      <label for="restaurantName">店名（會顯示在訊息中）</label>
+      <input type="text" id="restaurantName">
+    </div>
+    <div class="field">
+      <label for="restaurantUrl">店家連結</label>
+      <input type="text" id="restaurantUrl">
+    </div>
+    <div class="restaurant-meta" id="restaurantMeta"></div>
+  </div>
+
+  <div class="card">
+    <h2>② 接力回覆名單</h2>
+    <div class="field">
+      <label for="participants">每行一位，格式為「姓名」，會自動編號並加上斜線</label>
+      <textarea id="participants"></textarea>
+      <p class="hint">名單會自動儲存在這台電腦的瀏覽器中，下次開啟不需重新輸入。</p>
+    </div>
+  </div>
+
+  <button class="btn btn-primary" id="generateBtn">產生訊息</button>
+
+  <div class="card" style="margin-top:20px;">
+    <h2>③ 產生結果（可直接複製貼到 LINE）</h2>
+    <div class="output-wrap">
+      <textarea id="output" readonly></textarea>
+    </div>
+    <div class="output-actions">
+      <span class="copied-msg" id="copiedMsg">已複製！</span>
+      <button class="btn btn-secondary" id="copyBtn">複製訊息</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const RESTAURANTS = [
+  {"name":"少點鹽健康餐盒專賣萬隆店","type":"健康餐盒","hours":"10:00–20:00","distance":"萬隆側約 8–12 分","phone":"02-3234-0212","url":"https://www.google.com/maps/search/?api=1&query=%E5%B0%91%E9%BB%9E%E9%B9%BD%E5%81%A5%E5%BA%B7%E9%A4%90%E7%9B%92%E5%B0%88%E8%B3%A3%E8%90%AC%E9%9A%86%E5%BA%97"},
+  {"name":"饗soul健康餐盒","type":"健康餐盒","hours":"11:00–13:30","distance":"萬隆側約 12–15 分","phone":"02-2935-0613","url":"https://www.google.com/maps/search/?api=1&query=%E9%A5%97soul%E5%81%A5%E5%BA%B7%E9%A4%90%E7%9B%92+%E8%90%AC%E9%9A%86"},
+  {"name":"牛洞 台北萬隆店","type":"牛丼／日式","hours":"11:00–14:30","distance":"約 10 分","phone":"02-2930-0088","url":"https://www.google.com/maps/search/?api=1&query=%E7%89%9B%E6%B4%9E%E5%8F%B0%E5%8C%97%E8%90%AC%E9%9A%86%E5%BA%97"},
+  {"name":"港式萬隆燒臘","type":"燒臘便當","hours":"11:00–14:00","distance":"約 10 分","phone":"02-2935-3402","url":"https://www.google.com/maps/search/?api=1&query=%E6%B8%AF%E5%BC%8F%E8%90%AC%E9%9A%86%E7%87%92%E8%87%98"},
+  {"name":"家鄉味小吃","type":"小吃／飯類","hours":"11:00–14:30","distance":"約 5–10 分","phone":"02-2932-6075","url":"https://www.google.com/maps/search/?api=1&query=%E5%AE%B6%E9%84%89%E5%91%B3%E5%B0%8F%E5%90%83+%E7%BE%85%E6%96%AF%E7%A6%8F%E8%B7%AF%E4%BA%94%E6%AE%B5150%E5%B7%B757%E8%99%9F"},
+  {"name":"嘉湘滇緬小吃","type":"滇緬料理","hours":"11:00–14:00","distance":"萬隆側約 10–15 分","phone":"02-2932-6882","url":"https://www.google.com/maps/search/?api=1&query=%E5%98%89%E6%B9%98%E6%BB%87%E7%B7%AC%E5%B0%8F%E5%90%83"},
+  {"name":"神秘花園","type":"簡餐","hours":"11:00–14:30","distance":"約 3–5 分","phone":"02-2932-9701","url":"https://www.google.com/maps/search/?api=1&query=%E7%A5%9E%E7%A7%98%E8%8A%B1%E5%9C%92+%E6%B1%80%E5%B7%9E%E8%B7%AF%E5%9B%9B%E6%AE%B541%E8%99%9F"},
+  {"name":"SHALLOT 紅蔥二號店","type":"漢堡／西式","hours":"09:30–14:00","distance":"約 5–10 分","phone":"—","url":"https://www.google.com/maps/search/?api=1&query=SHALLOT%E7%B4%85%E8%94%A5%E4%BA%8C%E8%99%9F%E5%BA%97"},
+  {"name":"柚子小廚房","type":"早餐／簡餐","hours":"06:30–13:30","distance":"約 3–5 分","phone":"02-8663-3077","url":"https://www.google.com/maps/search/?api=1&query=%E6%9F%9A%E5%AD%90%E5%B0%8F%E5%BB%9A%E6%88%BF+%E6%B1%80%E5%B7%9E%E8%B7%AF%E5%9B%9B%E6%AE%B5134%E8%99%9F"},
+  {"name":"吃飯囉！媽媽便當","type":"健康便當","hours":"11:30–13:30","distance":"校內","phone":"0966-555-057*","url":"https://www.google.com/maps/search/?api=1&query=%E5%90%83%E9%A3%AF%E5%9B%89%E5%AA%BD%E5%AA%BD%E4%BE%BF%E7%95%B6+%E8%87%BA%E5%B8%AB%E5%A4%A7%E5%85%AC%E9%A4%A8%E6%A0%A1%E5%8D%80"},
+  {"name":"紅廚複合式（學生餐廳）","type":"自助餐","hours":"11:00–13:30","distance":"校內","phone":"02-8935-1533*","url":"https://www.google.com/maps/search/?api=1&query=%E7%B4%85%E5%BB%9A%E8%A4%87%E5%90%88%E5%BC%8F%E5%AD%B8%E7%94%9F%E9%A4%90%E5%BB%B3+%E5%B8%AB%E5%A4%A7%E5%85%AC%E9%A4%A8"},
+  {"name":"地方煮夫 Local Husband","type":"餐盒","hours":"11:00–13:00","distance":"公館側約 10–15 分","phone":"02-2737-4222","url":"https://www.google.com/maps/search/?api=1&query=%E5%9C%B0%E6%96%B9%E7%85%AE%E5%A4%AB+Local+Husband"},
+  {"name":"池上吾家木盒便當","type":"木盒便當","hours":"11:00–14:00","distance":"約 5–10 分","phone":"02-2931-7830","url":"https://www.google.com/maps/search/?api=1&query=%E6%B1%A0%E4%B8%8A%E5%90%BE%E5%AE%B6%E6%9C%A8%E7%9B%92%E4%BE%BF%E7%95%B6"},
+  {"name":"壹森泰食堂~師大第一腿(公館店）","type":"泰式","hours":"11:00–22:30","distance":"公館側約 12–15 分","phone":"02-3365-3399","url":"https://www.google.com/maps/search/?api=1&query=%E5%A3%B9%E6%A3%AE%E6%B3%B0%E9%A3%9F%E5%A0%82%E5%B8%AB%E5%A4%A7%E7%AC%AC%E4%B8%80%E8%85%BF%E5%85%AC%E9%A4%A8%E5%BA%97"},
+  {"name":"丼丼GO-公館店","type":"日式丼飯","hours":"11:00–21:00","distance":"公館側約 12–15 分","phone":"02-2367-6797","url":"https://www.google.com/maps/search/?api=1&query=%E4%B8%BC%E4%B8%BCGO%E5%85%AC%E9%A4%A8%E5%BA%97"},
+  {"name":"築本屋公館店","type":"炸豬排／日式","hours":"11:00–21:00","distance":"公館站附近","phone":"02-2368-0682","url":"https://www.google.com/maps/search/?api=1&query=%E7%AF%89%E6%9C%AC%E5%B1%8B%E5%85%AC%E9%A4%A8%E5%BA%97"},
+  {"name":"Miss Energy 能量小姐（台北公館）","type":"低卡餐盒","hours":"10:30–19:30","distance":"公館站附近","phone":"02-2365-6857","url":"https://www.google.com/maps/search/?api=1&query=Miss+Energy%E8%83%BD%E9%87%8F%E5%B0%8F%E5%A7%90%E5%85%AC%E9%A4%A8"},
+  {"name":"壹之鄉排骨","type":"排骨便當","hours":"11:00–20:00","distance":"水源市場","phone":"02-2368-0878","url":"https://www.google.com/maps/search/?api=1&query=%E5%A3%B9%E4%B9%8B%E9%84%89%E6%8E%92%E9%AA%A8+%E6%B0%B4%E6%BA%90%E5%B8%82%E5%A0%B4"},
+  {"name":"Sydney 餐盒&咖啡專門（公館外帶門市）","type":"餐盒","hours":"11:00–20:00","distance":"公館站附近","phone":"02-2726-5826","url":"https://www.google.com/maps/search/?api=1&query=Sydney%E9%A4%90%E7%9B%92%E5%92%96%E5%95%A1%E5%B0%88%E9%96%80%E5%85%AC%E9%A4%A8"},
+  {"name":"大福利排骨大王 公館店","type":"排骨／便當","hours":"11:00–20:30","distance":"公館站附近","phone":"02-2365-1009","url":"https://www.google.com/maps/search/?api=1&query=%E5%A4%A7%E7%A6%8F%E5%88%A9%E6%8E%92%E9%AA%A8%E5%A4%A7%E7%8E%8B%E5%85%AC%E9%A4%A8%E5%BA%97"}
+];
+
+const DEFAULT_PARTICIPANTS = "志鴻老師\n人平\nSarah\n建豐\n宇亮";
+const STORAGE_KEY = "lunch-message-participants";
+
+const selectEl = document.getElementById("restaurantSelect");
+const nameEl = document.getElementById("restaurantName");
+const urlEl = document.getElementById("restaurantUrl");
+const metaEl = document.getElementById("restaurantMeta");
+const participantsEl = document.getElementById("participants");
+const outputEl = document.getElementById("output");
+const copiedMsg = document.getElementById("copiedMsg");
+
+function populateSelect() {
+  const customOpt = document.createElement("option");
+  customOpt.value = "__custom__";
+  customOpt.textContent = "✏️ 自訂輸入（不在清單中的店家）";
+  selectEl.appendChild(customOpt);
+
+  RESTAURANTS.forEach((r, i) => {
+    const opt = document.createElement("option");
+    opt.value = String(i);
+    opt.textContent = `${r.name}（${r.type}）`;
+    selectEl.appendChild(opt);
+  });
+}
+
+function applyRestaurant(index) {
+  if (index === "__custom__") {
+    nameEl.value = "";
+    urlEl.value = "";
+    metaEl.textContent = "請自行輸入店名與連結。";
+    nameEl.focus();
+    return;
+  }
+  const r = RESTAURANTS[Number(index)];
+  nameEl.value = r.name;
+  urlEl.value = r.url;
+  metaEl.textContent = `類型：${r.type}　｜　週二營業：${r.hours}　｜　距離：${r.distance}　｜　電話：${r.phone}`;
+}
+
+selectEl.addEventListener("change", () => applyRestaurant(selectEl.value));
+
+function loadParticipants() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    participantsEl.value = saved !== null ? saved : DEFAULT_PARTICIPANTS;
+  } catch (e) {
+    participantsEl.value = DEFAULT_PARTICIPANTS;
+  }
+}
+
+participantsEl.addEventListener("input", () => {
+  try { localStorage.setItem(STORAGE_KEY, participantsEl.value); } catch (e) {}
+});
+
+function buildMessage() {
+  const name = nameEl.value.trim() || "【尚未選擇店家】";
+  const url = urlEl.value.trim() || "【尚未提供連結】";
+  const names = participantsEl.value.split("\n").map(s => s.trim()).filter(Boolean);
+  const list = names.map((n, i) => `${i + 1}.${n}/`).join("\n");
+
+  return `大家下午好，本週的午餐幸運兒是【${name}】。
+
+菜單與連結：
+
+${url}
+
+ 請在週日晚上前依照下面格式接力回覆：
+ 「姓名／餐點／特殊需求」
+（若沒有特殊需求空白即可）
+
+例如：
+宇亮／舒肥雞胸餐／飯半份
+星期一收單後我就直接下訂，謝謝大家！
+
+${list}`;
+}
+
+document.getElementById("generateBtn").addEventListener("click", () => {
+  outputEl.value = buildMessage();
+});
+
+document.getElementById("copyBtn").addEventListener("click", async () => {
+  if (!outputEl.value) {
+    outputEl.value = buildMessage();
+  }
+  try {
+    await navigator.clipboard.writeText(outputEl.value);
+  } catch (e) {
+    outputEl.select();
+    document.execCommand("copy");
+  }
+  copiedMsg.classList.add("show");
+  setTimeout(() => copiedMsg.classList.remove("show"), 1600);
+});
+
+populateSelect();
+loadParticipants();
+selectEl.value = "0";
+applyRestaurant("0");
+outputEl.value = buildMessage();
+</script>
+</body>
+</html>
