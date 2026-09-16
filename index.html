@@ -157,6 +157,44 @@
     user-select: none;
   }
   details { margin-top: 10px; }
+  textarea#repliesInput {
+    min-height: 90px;
+    resize: vertical;
+    line-height: 1.6;
+  }
+  .order-sheet {
+    background: #fafbfc;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    font-size: 19px;
+    line-height: 2;
+  }
+  .order-sheet .order-row {
+    display: flex;
+    gap: 8px;
+    padding: 6px 0;
+    border-bottom: 1px dashed var(--border);
+  }
+  .order-sheet .order-row:last-child { border-bottom: none; }
+  .order-sheet .order-num {
+    color: var(--muted);
+    font-weight: 700;
+    min-width: 22px;
+  }
+  .order-sheet .order-name {
+    font-weight: 700;
+    min-width: 90px;
+  }
+  .order-sheet .order-dish { flex: 1; }
+  .order-sheet .order-note {
+    color: var(--muted);
+    font-size: 16px;
+  }
+  .order-sheet .order-row.bad {
+    color: #b45309;
+    background: #fffbeb;
+  }
 </style>
 </head>
 <body>
@@ -178,13 +216,17 @@
       <label for="restaurantUrl">店家連結</label>
       <input type="text" id="restaurantUrl">
     </div>
+    <div class="field">
+      <label for="restaurantPhone">店家電話（用於④直接撥打）</label>
+      <input type="text" id="restaurantPhone">
+    </div>
     <div class="restaurant-meta" id="restaurantMeta"></div>
   </div>
 
   <div class="card">
     <h2>② 接力回覆名單</h2>
     <div class="field">
-      <label for="participants">每行一位，格式為「姓名」，會自動編號並加上斜線</label>
+      <label for="participants">每行一組，同一行可填多人並用「、」分隔（例如：志鴻老師、人平、Sarah），會依行數自動編號</label>
       <textarea id="participants"></textarea>
       <p class="hint">名單會自動儲存在這台電腦的瀏覽器中，下次開啟不需重新輸入。</p>
     </div>
@@ -203,6 +245,25 @@
       <button class="btn btn-line" id="copyOpenLineBtn">複製並開啟 LINE</button>
     </div>
     <p class="hint" style="margin-top:8px;">「複製並開啟 LINE」會先複製訊息，再嘗試跳轉開啟 LINE App（需在手機瀏覽器操作且已安裝 LINE），開啟後請自行選擇群組並貼上。</p>
+  </div>
+
+  <div class="card" style="margin-top:20px;">
+    <h2>④ 彙整訂單（週一打電話訂購時使用）</h2>
+    <div class="field">
+      <label for="repliesInput">直接把整段 LINE 對話複製貼上即可（含公告訊息、連結、閒聊都沒關係，程式會自動抓出「姓名／餐點／特殊需求」格式的訊息）</label>
+      <textarea id="repliesInput" placeholder="可直接整段貼上，例如：&#10;大家下午好，本週的午餐幸運兒是...&#10;（中間夾雜公告、連結、大家的閒聊都可以）&#10;志鴻老師／舒肥雞胸餐／飯半份&#10;人平／招牌便當&#10;Sarah／滷肉飯／加辣"></textarea>
+    </div>
+    <button class="btn btn-primary" id="parseBtn">解析成訂單清單</button>
+
+    <div id="orderResult" style="margin-top:16px; display:none;">
+      <div id="orderSheet" class="order-sheet"></div>
+      <div class="output-actions">
+        <span class="copied-msg" id="orderCopiedMsg">已複製！</span>
+        <button class="btn btn-secondary" id="copyOrderBtn">複製訂單清單</button>
+        <button class="btn btn-line" id="callBtn" style="background:var(--accent);">📞 撥打店家電話</button>
+      </div>
+      <p class="hint" id="orderWarning" style="display:none; color:#b45309;"></p>
+    </div>
   </div>
 </div>
 
@@ -230,12 +291,13 @@ const RESTAURANTS = [
   {"name":"大福利排骨大王 公館店","type":"排骨／便當","hours":"11:00–20:30","distance":"公館站附近","phone":"02-2365-1009","url":"https://www.google.com/maps/search/?api=1&query=%E5%A4%A7%E7%A6%8F%E5%88%A9%E6%8E%92%E9%AA%A8%E5%A4%A7%E7%8E%8B%E5%85%AC%E9%A4%A8%E5%BA%97"}
 ];
 
-const DEFAULT_PARTICIPANTS = "志鴻老師\n人平\nSarah\n建豐\n宇亮";
+const DEFAULT_PARTICIPANTS = "志鴻老師、人平、Sarah\n建豐\n宇亮";
 const STORAGE_KEY = "lunch-message-participants";
 
 const selectEl = document.getElementById("restaurantSelect");
 const nameEl = document.getElementById("restaurantName");
 const urlEl = document.getElementById("restaurantUrl");
+const phoneEl = document.getElementById("restaurantPhone");
 const metaEl = document.getElementById("restaurantMeta");
 const participantsEl = document.getElementById("participants");
 const outputEl = document.getElementById("output");
@@ -259,6 +321,7 @@ function applyRestaurant(index) {
   if (index === "__custom__") {
     nameEl.value = "";
     urlEl.value = "";
+    phoneEl.value = "";
     metaEl.textContent = "請自行輸入店名與連結。";
     nameEl.focus();
     return;
@@ -266,6 +329,7 @@ function applyRestaurant(index) {
   const r = RESTAURANTS[Number(index)];
   nameEl.value = r.name;
   urlEl.value = r.url;
+  phoneEl.value = r.phone.includes("—") ? "" : r.phone.replace(/\*$/, "");
   metaEl.textContent = `類型：${r.type}　｜　週二營業：${r.hours}　｜　距離：${r.distance}　｜　電話：${r.phone}`;
 }
 
@@ -288,7 +352,7 @@ function buildMessage() {
   const name = nameEl.value.trim() || "【尚未選擇店家】";
   const url = urlEl.value.trim() || "【尚未提供連結】";
   const names = participantsEl.value.split("\n").map(s => s.trim()).filter(Boolean);
-  const list = names.map((n, i) => `${i + 1}.${n}/`).join("\n");
+  const list = names.map((n, i) => `${i + 1}.${n}`).join("\n");
 
   return `大家下午好，本週的午餐幸運兒是【${name}】。
 
@@ -332,6 +396,129 @@ document.getElementById("copyOpenLineBtn").addEventListener("click", async () =>
   setTimeout(() => {
     window.location.href = "line://nv/chat/";
   }, 250);
+});
+
+const repliesInputEl = document.getElementById("repliesInput");
+const orderResultEl = document.getElementById("orderResult");
+const orderSheetEl = document.getElementById("orderSheet");
+const orderWarningEl = document.getElementById("orderWarning");
+const orderCopiedMsg = document.getElementById("orderCopiedMsg");
+let parsedOrderText = "";
+
+// 這些是①②產生的公告訊息裡固定會出現的樣板文字／範例，
+// 整段對話複製貼上時要先濾掉，才不會被誤判成訂單
+const BOILERPLATE_EXACT = new Set([
+  "「姓名／餐點／特殊需求」",
+  "宇亮／舒肥雞胸餐／飯半份",
+  "（若沒有特殊需求空白即可）",
+  "菜單與連結：",
+  "例如：",
+  "星期一收單後我就直接下訂，謝謝大家！",
+  "請在週日晚上前依照下面格式接力回覆："
+]);
+
+function isBoilerplateLine(line) {
+  if (BOILERPLATE_EXACT.has(line)) return true;
+  if (line.includes("午餐幸運兒")) return true; // 開頭公告句（含店名，內容會變動）
+  if (/^https?:\/\//i.test(line)) return true;  // 菜單連結
+  return false;
+}
+
+function parseReplies(text) {
+  const results = [];
+  text
+    .split("\n")
+    .map(l => l.trim())
+    .filter(Boolean)
+    .forEach(line => {
+      if (isBoilerplateLine(line)) return; // 樣板文字／連結，直接略過
+      const hasSlash = line.includes("／") || line.includes("/");
+      if (!hasSlash) return; // 沒有用斜線分隔，視為閒聊或名單公告，直接略過
+
+      // 去掉開頭的編號，例如「1.」「2、」
+      const stripped = line.replace(/^\s*\d+[.、)]\s*/, "");
+      const normalized = stripped.replace(/／/g, "/");
+      const parts = normalized.split("/").map(p => p.trim());
+      const name = parts[0] || "";
+      const dish = parts[1] || "";
+      const note = parts.slice(2).join("/").trim();
+      const ok = Boolean(name && dish);
+      results.push({ name, dish, note, ok, raw: line });
+    });
+  return results;
+}
+
+function renderOrders(orders) {
+  orderSheetEl.innerHTML = "";
+  const badLines = [];
+
+  orders.forEach((o, i) => {
+    const row = document.createElement("div");
+    row.className = "order-row" + (o.ok ? "" : " bad");
+    if (o.ok) {
+      row.innerHTML = `<span class="order-num">${i + 1}.</span>` +
+        `<span class="order-name">${escapeHtml(o.name)}</span>` +
+        `<span class="order-dish">${escapeHtml(o.dish)}${o.note ? `　<span class="order-note">（${escapeHtml(o.note)}）</span>` : ""}</span>`;
+    } else {
+      row.innerHTML = `<span class="order-num">${i + 1}.</span>` +
+        `<span class="order-dish">⚠️ 格式待確認：${escapeHtml(o.raw)}</span>`;
+      badLines.push(i + 1);
+    }
+    orderSheetEl.appendChild(row);
+  });
+
+  if (badLines.length) {
+    orderWarningEl.style.display = "block";
+    orderWarningEl.textContent = `第 ${badLines.join("、")} 行沒有偵測到「姓名／餐點」格式，請手動確認內容。`;
+  } else {
+    orderWarningEl.style.display = "none";
+  }
+
+  parsedOrderText = orders
+    .map((o, i) => o.ok
+      ? `${i + 1}. ${o.name}－${o.dish}${o.note ? `（${o.note}）` : ""}`
+      : `${i + 1}. ⚠️ ${o.raw}`)
+    .join("\n");
+}
+
+function escapeHtml(str) {
+  const div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+document.getElementById("parseBtn").addEventListener("click", () => {
+  const orders = parseReplies(repliesInputEl.value);
+  if (!orders.length) {
+    orderResultEl.style.display = "none";
+    return;
+  }
+  renderOrders(orders);
+  orderResultEl.style.display = "block";
+});
+
+document.getElementById("copyOrderBtn").addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText(parsedOrderText);
+  } catch (e) {
+    const ta = document.createElement("textarea");
+    ta.value = parsedOrderText;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    document.body.removeChild(ta);
+  }
+  orderCopiedMsg.classList.add("show");
+  setTimeout(() => orderCopiedMsg.classList.remove("show"), 1600);
+});
+
+document.getElementById("callBtn").addEventListener("click", () => {
+  const phone = phoneEl.value.trim();
+  if (!phone) {
+    alert("目前沒有店家電話，請先在①填入電話號碼。");
+    return;
+  }
+  window.location.href = "tel:" + phone.replace(/[^0-9+]/g, "");
 });
 
 populateSelect();
