@@ -120,6 +120,11 @@
     color: var(--accent);
   }
   .btn-secondary:hover { background: #e0e7ff; }
+  .btn-line {
+    background: #06c755;
+    color: #fff;
+  }
+  .btn-line:hover { background: #05a847; }
   .output-wrap { position: relative; }
   textarea#output {
     min-height: 320px;
@@ -130,6 +135,7 @@
   }
   .output-actions {
     display: flex;
+    flex-wrap: wrap;
     justify-content: flex-end;
     gap: 8px;
     margin-top: 12px;
@@ -194,7 +200,9 @@
     <div class="output-actions">
       <span class="copied-msg" id="copiedMsg">已複製！</span>
       <button class="btn btn-secondary" id="copyBtn">複製訊息</button>
+      <button class="btn btn-line" id="copyOpenLineBtn">複製並開啟 LINE</button>
     </div>
+    <p class="hint" style="margin-top:8px;">「複製並開啟 LINE」會先複製訊息，再嘗試跳轉開啟 LINE App（需在手機瀏覽器操作且已安裝 LINE），開啟後請自行選擇群組並貼上。</p>
   </div>
 </div>
 
@@ -303,7 +311,7 @@ document.getElementById("generateBtn").addEventListener("click", () => {
   outputEl.value = buildMessage();
 });
 
-document.getElementById("copyBtn").addEventListener("click", async () => {
+async function copyOutput() {
   if (!outputEl.value) {
     outputEl.value = buildMessage();
   }
@@ -315,6 +323,15 @@ document.getElementById("copyBtn").addEventListener("click", async () => {
   }
   copiedMsg.classList.add("show");
   setTimeout(() => copiedMsg.classList.remove("show"), 1600);
+}
+
+document.getElementById("copyBtn").addEventListener("click", copyOutput);
+
+document.getElementById("copyOpenLineBtn").addEventListener("click", async () => {
+  await copyOutput();
+  setTimeout(() => {
+    window.location.href = "line://nv/chat/";
+  }, 250);
 });
 
 populateSelect();
