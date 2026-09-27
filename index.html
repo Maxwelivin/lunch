@@ -291,7 +291,7 @@ const RESTAURANTS = [
   {"name":"大福利排骨大王 公館店","type":"排骨／便當","hours":"11:00–20:30","distance":"公館站附近","phone":"02-2365-1009","url":"https://www.google.com/maps/search/?api=1&query=%E5%A4%A7%E7%A6%8F%E5%88%A9%E6%8E%92%E9%AA%A8%E5%A4%A7%E7%8E%8B%E5%85%AC%E9%A4%A8%E5%BA%97"}
 ];
 
-const DEFAULT_PARTICIPANTS = "志鴻老師、人平、Sarah\n建豐\n宇亮";
+const DEFAULT_PARTICIPANTS = "人平\nSarah\n建豐\n宇亮";
 const STORAGE_KEY = "lunch-message-participants";
 
 const selectEl = document.getElementById("restaurantSelect");
@@ -352,7 +352,7 @@ function buildMessage() {
   const name = nameEl.value.trim() || "【尚未選擇店家】";
   const url = urlEl.value.trim() || "【尚未提供連結】";
   const names = participantsEl.value.split("\n").map(s => s.trim()).filter(Boolean);
-  const list = names.map((n, i) => `${i + 1}.${n}`).join("\n");
+  const list = names.map((n, i) => `${i + 1}.${n.replace(/[\/／]+$/, "")}/`).join("\n");
 
   return `大家下午好，本週的午餐幸運兒是【${name}】。
 
